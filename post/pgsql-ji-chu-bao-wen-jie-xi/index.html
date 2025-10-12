@@ -1,0 +1,196 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    
+<meta charset="utf-8" >
+
+<title>PGSQL基础报文解析 | WenTao Blog</title>
+<meta name="description" content="温故而知新">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.0/animate.min.css">
+
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+<link rel="shortcut icon" href="https://blank-knight.github.io//favicon.ico?v=1760266414536">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css">
+<link rel="stylesheet" href="https://blank-knight.github.io//styles/main.css">
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+<script src="//cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.5.1/build/highlight.min.js"></script>
+
+
+
+  </head>
+  <body>
+    <div id="app" class="main">
+      <div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://blank-knight.github.io/">
+        <img class="avatar" src="https://blank-knight.github.io//images/avatar.png?v=1760266414536" alt="" width="32px" height="32px">
+      </a>
+      <a href="https://blank-knight.github.io/">
+        <h1 class="site-title">WenTao Blog</h1>
+      </a>
+    </div>
+    <div class="right">
+      <transition name="fade">
+        <i class="icon" :class="{ 'icon-close-outline': menuVisible, 'icon-menu-outline': !menuVisible }" @click="menuVisible = !menuVisible"></i>
+      </transition>
+    </div>
+  </div>
+</div>
+
+<transition name="fade">
+  <div class="menu-container" style="display: none;" v-show="menuVisible">
+    <div class="menu-list">
+      
+        
+          <a href="/" class="menu purple-link">
+            首页
+          </a>
+        
+      
+        
+          <a href="/archives" class="menu purple-link">
+            归档
+          </a>
+        
+      
+        
+          <a href="/tags" class="menu purple-link">
+            标签
+          </a>
+        
+      
+        
+          <a href="/post/about" class="menu purple-link">
+            关于
+          </a>
+        
+      
+    </div>
+  </div>
+</transition>
+
+
+      <div class="content-container">
+        <div class="post-detail">
+          
+            <div class="feature-container" style="background-image: url('https://api.opics.org/api')">
+            </div>
+          
+          <h2 class="post-title">PGSQL基础报文解析</h2>
+          <div class="post-info post-detail-info">
+            <span><i class="icon-calendar-outline"></i> 2025-10-11</span>
+            
+          </div>
+          <div class="post-content" v-pre>
+            <p>讲解基础的PBDES报文</p>
+<!-- more -->
+<h2 id="pbdes报文">P/B/D/E/S报文</h2>
+<h3 id="p-parse">P (Parse)</h3>
+<pre><code>客户端发送 SQL 模板，如 SELECT name FROM users WHERE id = $1。
+服务端返回1 (ParseComplete)：服务器确认解析成功。
+</code></pre>
+<h4 id="b-bind">B (Bind)</h4>
+<pre><code>客户端发送参数值，如 123。
+服务端返回2 (BindComplete)：服务器确认绑定成功。
+</code></pre>
+<h3 id="d-describe">D (Describe)</h3>
+<pre><code>客户端请求描述已经绑定好参数的 Portal。
+服务端返回T (RowDescription)：服务器返回结果集结构（有一列 name）。
+</code></pre>
+<h3 id="e-execute">E (Execute)</h3>
+<pre><code>客户端命令服务器执行查询。
+服务端返回D (DataRow)：服务器返回查询到的数据行（如 'Alice'）。以及C (CommandComplete)：服务器确认执行成功（如 SELECT 1）
+</code></pre>
+<h3 id="s-sync">S (Sync)</h3>
+<pre><code>客户端请求同步状态。
+服务端返回Z (ReadyForQuery)：服务器确认已空闲，可以接受下一次查询。
+</code></pre>
+<h2 id="pdsbes和pbdes的区别">P/D/S...B/E/S和P/B/D/E/S的区别</h2>
+<h3 id="序列-a-带提前描述pds-bes用于强制二进制传输">序列 A (带提前描述)：&gt;P/D/S ... &gt;B/E/S，用于<strong>强制二进制传输</strong></h3>
+<h4 id="阶段一准备与规划-pds">阶段一：准备与规划 (P/D/S)</h4>
+<pre><code>目标：完成 SQL 模板的解析，并全面了解这个模板的所有信息（需要什么参数、返回什么结构）。
+产出：客户端拥有了执行该查询所需的全部 “元数据”。
+类比：你去一家新餐厅，先仔细研究菜单（Describe），知道了每道菜的成分和价格，然后再决定点什么。
+</code></pre>
+<h4 id="阶段二执行与获取-bes">阶段二：执行与获取 (B/E/S)</h4>
+<pre><code>目标：使用具体参数，快速执行并获取结果。
+过程：因为前期准备充分，这个阶段的执行可以非常高效和精准。
+类比：你已经研究好菜单了，直接告诉服务员你的选择（Bind），然后等待上菜（Execute）。
+</code></pre>
+<h3 id="序列-b-隐含描述pbdes">序列 B (隐含描述)：&gt;P/B/D/E/S</h3>
+<pre><code>而序列 B 更像是 “边点菜边问”：
+    你告诉服务员一个菜名（Parse）。
+    你说 “就按这个做”（Bind）。
+    然后你才问服务员：“这道菜里有什么？”（Describe）。
+    最后才说：“好，上吧。”（Execute）。
+</code></pre>
+<h3 id="总结">总结</h3>
+<pre><code>因此序列A将 “准备” 和 “执行” 两个环节解耦能够获取更加详细的信息。
+以执行“Select '{a, Null}'::text[];”为例子，序列A的Bind的部分报文如下：
+    Result formats: 1
+    Format: Binary(1) 识别成的二进制数组类型，
+序列B的Bind的部分报文则如下：
+    Result formats: 0 未进行识别，当成的字符串处理
+</code></pre>
+
+          </div>
+        </div>
+
+        
+          <div class="next-post">
+            <a class="purple-link" href="https://blank-knight.github.io/post/java-pei-zhi/">
+              <h3 class="post-title">
+                下一篇：Java配置
+              </h3>
+            </a>
+          </div>
+          
+      </div>
+
+      
+
+      <div class="site-footer">
+  <div class="slogan">温故而知新</div>
+  <div class="social-container">
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+  </div>
+  Powered by <a href="https://github.com/getgridea/gridea" target="_blank">Gridea</a> | <a class="rss" href="https://blank-knight.github.io//atom.xml" target="_blank">RSS</a>
+</div>
+
+
+    </div>
+    <script type="application/javascript">
+
+hljs.initHighlightingOnLoad()
+
+var app = new Vue({
+  el: '#app',
+  data: {
+    menuVisible: false,
+  },
+})
+
+</script>
+
+
+
+
+  </body>
+</html>
